@@ -1,0 +1,52 @@
+services:
+  bot:
+    image: sl-tg-bot
+    container_name: sl-tg-bot
+    restart: always
+    networks:
+        - shared_net
+    volumes:
+      - /var/bot/static/:/app/static/
+      - /var/bot/db/:/app/db/
+  bg:
+    image: sl-tg-bot-bg
+    container_name: sl-tg-bot-bg
+    restart: always
+    networks:
+        - shared_net
+    volumes:
+      - /var/bot/static/:/app/static/
+      - /var/bot/db/:/app/db/
+  api:
+    image: sl-tg-bot-api
+    container_name: sl-tg-bot-api
+    restart: always
+    ports:
+      - "8000:8000"
+    networks:
+        - shared_net
+    volumes:
+      - /var/bot/static/:/app/static/
+      - /var/bot/db/:/app/db/
+  front:
+    image: sl-tg-bot-miniapp
+    container_name: sl-tg-bot-miniapp
+    ports:
+      - "3000:3000"
+    networks:
+        - shared_net
+  redis:
+    restart: always
+    image: redis:7-alpine
+    container_name: sl-redis
+    command:
+      - /bin/sh
+      - -c
+      - redis-server --requirepass "${REDIS_PASS}"
+    ports:
+      - "6379:6379"
+    networks:
+        - shared_net
+networks:
+  shared_net:
+    name: shared_net

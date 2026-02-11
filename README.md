@@ -2,7 +2,9 @@
 
 Репозиторий содержит инфраструктуру для запуска Telegram-бота конкурсов и связанного Web App (mini app).
 
-По структуре видно, что проект запускается набором контейнеров:
+## Что внутри
+
+Проект запускается набором контейнеров:
 
 - `bot` — основной Telegram-бот.
 - `bg` — фоновые задачи (Celery worker + beat).
@@ -10,64 +12,61 @@
 - `front` — мини-приложение (Node/Yarn dev server на 3000).
 - `redis` — брокер и backend для фоновых задач.
 
-## 1. Требования к серверу
+## Актуальный статус репозитория (важно)
 
-Минимально:
+На текущий момент в репозитории есть инфраструктурные файлы (`Dockerfile*`, `docker-compose.yml`, `nginx.conf`, docs),
+но **отсутствует основная папка с кодом приложения `src/`**, на которую ссылаются Dockerfile’ы.
 
-- Linux-сервер с установленными Docker и Docker Compose plugin.
-- Открытые порты:
-  - `443` — для HTTPS через Nginx.
-  - `3000` — если нужен прямой доступ к mini app (обычно закрывают и отдают через Nginx).
-  - `8000` — если нужен прямой доступ к API (обычно закрывают и отдают через Nginx).
-  - `6379` — Redis (рекомендуется не публиковать наружу и ограничить firewall).
-- Домен и TLS-сертификат (если используете Nginx из `nginx.conf`).
+Это означает:
+- `docker build` для `bot`, `api`, `bg`, `front` в текущем виде не сможет корректно собраться;
+- перед запуском нужно вернуть/добавить папку с исходниками (`src/internal`, `src/miniapp` и др.).
 
-## 2. Подготовка переменных окружения
+Проверка:
+
+```bash
+test -d src && echo "src exists" || echo "src is missing"
+```
+
+## Текущий практический приоритет
+
+Если ваша цель сейчас — **быстро поднять бота и адаптировать контент под свой проект**, сначала убедитесь, что кодовая папка `src/` присутствует в рабочей копии.
+
+Более подробное техническое ревью и идеи улучшений на будущее вынесены в отдельный файл:
+- `docs/infra-review.md`
+
+---
+
+## Быстрый старт (после возврата `src/`)
+
+### 1) Подготовьте `.env`
 
 В репозитории есть пример env-файла: `doc_2026-02-11_13-30-10.env.example`.
 
 1. Создайте `.env` рядом с `docker-compose.yml`.
-2. Скопируйте значения из примера и заполните своими данными.
-
-Базовый шаблон:
+2. Заполните минимум:
 
 ```env
 BOT_TOKEN=<telegram_bot_token>
 ROOT_ADMIN_TG_IDS=[123456789,987654321]
-
-# Redis auth (используется в docker-compose для redis-server --requirepass)
 REDIS_PASS=<strong_password>
 
-# Укажите Redis URI с паролем и нужными DB
+# В Docker-сети используйте host redis
 REDIS_BROKER_URI=redis://:<REDIS_PASS>@redis:6379/11
 REDIS_BROKER_RESULT_BACKEND_URI=redis://:<REDIS_PASS>@redis:6379/12
 ```
 
-Примечания:
+> В исходном примере env Redis указан через `localhost`; для Docker-сети обычно корректнее `redis`.
 
-- `ROOT_ADMIN_TG_IDS` — список Telegram ID администраторов, которым разрешён админ-доступ к боту.
-- В примере из репозитория Redis указан как `localhost`; в Docker-сети корректнее использовать хост `redis`.
-- Не храните реальные токены и пароли в git.
-
-## 3. Подготовка директорий для данных
-
-Сервисам пробрасываются volumes:
-
-- `/var/bot/static/` -> `/app/static/`
-- `/var/bot/db/` -> `/app/db/`
-
-Создайте их на сервере заранее:
+### 2) Подготовьте директории данных на хосте
 
 ```bash
 sudo mkdir -p /var/bot/static /var/bot/db
 sudo chown -R $USER:$USER /var/bot
 ```
 
-## 4. Сборка Docker-образов
+### 3) Соберите образы
 
-`docker-compose.yml` использует **готовые имена образов**, а не `build`-секции, поэтому сначала нужно собрать образы вручную.
-
-Из корня проекта:
+`docker-compose.yml` использует готовые имена образов, поэтому сначала соберите их вручную:
 
 ```bash
 docker build -f Dockerfile.bot -t sl-tg-bot .
@@ -76,55 +75,53 @@ docker build -f Dockerfile.api -t sl-tg-bot-api .
 docker build -f Dockerfile.miniapp -t sl-tg-bot-miniapp .
 ```
 
-## 5. Запуск контейнеров
+### 4) Запустите контейнеры
 
 ```bash
 docker compose up -d
-```
-
-Проверка статуса:
-
-```bash
 docker compose ps
-docker compose logs -f bot
 ```
 
-При первом запуске проверьте логи всех ключевых сервисов:
+### 5) Проверьте логи ключевых сервисов
 
 ```bash
+docker compose logs -f bot
 docker compose logs -f api
 docker compose logs -f bg
 docker compose logs -f front
 docker compose logs -f redis
 ```
 
-## 6. Настройка reverse proxy (Nginx)
+---
 
-В файле `nginx.conf` есть пример проксирования:
+## Что проверить после запуска
 
+- Бот отвечает в Telegram.
+- Админ с ID из `ROOT_ADMIN_TG_IDS` имеет доступ к админ-функциям.
+- API отвечает (напрямую или через прокси).
+- Mini app открывается.
+- Фоновые задачи выполняются без ошибок.
+
+---
+
+## Nginx (если нужен reverse proxy)
+
+В `nginx.conf` есть пример:
 - `/` -> `https://localhost:3000/` (mini app)
 - `/bot/api/` -> `http://localhost:8000/api/` (backend API)
 
 Что сделать:
-
 1. Положить конфиг в `/etc/nginx/sites-available/<your-domain>.conf`.
 2. Проверить `server_name` и пути до TLS-сертификатов.
 3. Включить сайт симлинком в `sites-enabled`.
 4. Проверить конфиг: `sudo nginx -t`.
 5. Перезапустить Nginx: `sudo systemctl reload nginx`.
 
-> Если mini app работает по HTTP внутри контейнера, обычно используют `proxy_pass http://localhost:3000/;`. Проверьте это в вашем окружении.
+> Если mini app внутри контейнера работает по HTTP, обычно используют `proxy_pass http://localhost:3000/;`.
 
-## 7. Чек-лист после развёртывания
+---
 
-- Бот отвечает в Telegram.
-- Админ с ID из `ROOT_ADMIN_TG_IDS` имеет доступ к админ-функциям.
-- API отвечает через прокси endpoint `/bot/api/`.
-- Mini app открывается по домену.
-- Фоновые задачи выполняются без ошибок (логи `bg`).
-- Redis доступен только из доверенной сети.
-
-## 8. Обновление на сервере
+## Обновление на сервере
 
 Типовой сценарий:
 
@@ -143,20 +140,29 @@ docker compose up -d
 docker image prune -f
 ```
 
-## 9. Быстрый troubleshooting
+---
 
-- Контейнер `bot`/`api` падает сразу:
+## Быстрый troubleshooting
+
+- `docker build` падает на `COPY ./src/...`:
+  - проверьте, что папка `src/` реально присутствует в репозитории;
+  - проверьте, что вы на нужной ветке/коммите;
+  - если код хранится в другом (приватном) репозитории, синхронизируйте его в этот проект.
+- `bot`/`api` падает сразу:
   - проверьте заполнение `.env`;
   - проверьте корректность `BOT_TOKEN`;
-  - убедитесь, что Redis URI содержит пароль и правильный хост `redis`.
+  - проверьте `REDIS_PASS` и Redis URI (host `redis`, корректный DB).
 - Нет доступа к Web App/API через домен:
   - проверьте `nginx -t`;
   - проверьте TLS-сертификаты и `server_name`;
-  - проверьте открытые порты firewall/security group.
+  - проверьте firewall/security group.
 - Celery не выполняет задачи:
   - проверьте логи `bg`;
   - проверьте `REDIS_BROKER_URI` и `REDIS_BROKER_RESULT_BACKEND_URI`.
 
 ---
 
-Если нужно, можно дополнительно добавить отдельный `docker-compose.prod.yml` с `build`-секциями, healthcheck'ами и отключением публикации внутренних портов наружу.
+Если позже понадобится, можно добавить отдельный `docker-compose.prod.yml` с:
+- `build`-секциями,
+- healthcheck’ами,
+- отключением публикации внутренних портов наружу.

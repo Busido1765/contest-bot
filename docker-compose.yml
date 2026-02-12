@@ -1,26 +1,41 @@
 services:
   bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
     image: sl-tg-bot
     container_name: sl-tg-bot
     restart: always
+    env_file:
+      - .env
     networks:
         - shared_net
     volumes:
       - /var/bot/static/:/app/static/
       - /var/bot/db/:/app/db/
   bg:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
     image: sl-tg-bot-bg
     container_name: sl-tg-bot-bg
     restart: always
+    env_file:
+      - .env
     networks:
         - shared_net
     volumes:
       - /var/bot/static/:/app/static/
       - /var/bot/db/:/app/db/
   api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     image: sl-tg-bot-api
     container_name: sl-tg-bot-api
     restart: always
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     networks:
@@ -29,8 +44,13 @@ services:
       - /var/bot/static/:/app/static/
       - /var/bot/db/:/app/db/
   front:
+    build:
+      context: .
+      dockerfile: Dockerfile.miniapp
     image: sl-tg-bot-miniapp
     container_name: sl-tg-bot-miniapp
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     networks:

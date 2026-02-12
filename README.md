@@ -21,61 +21,130 @@
 
 ---
 
-## Быстрый старт (рекомендуется для первого запуска)
+## Deployment / Docker Compose
 
-### 1) Подготовьте `.env`
+> `docker-compose.yml` в корне и `src/docker/docker-compose.yml` содержат одинаковый набор сервисов (`bot`, `bg`, `api`, `front`, `redis`) с `build`, `env_file: .env` и host-bind volumes `/var/bot/...`. Обычно достаточно работать с корневым файлом.
 
-В репозитории есть пример env-файла: `doc_2026-02-11_13-30-10.env.example`.
+### A) Prerequisites
 
-1. Создайте `.env` рядом с `docker-compose.yml`.
-2. Заполните минимум:
+- Docker Engine (с поддержкой `docker compose` plugin).
+- Git.
+- Доступ на запись к директориям на хосте: `/var/bot/static` и `/var/bot/db`.
+
+Проверка:
+
+```bash
+docker --version
+docker compose version
+```
+
+### B) Setup `.env`
+
+1. Скопируйте пример переменных в корне репозитория:
+
+```bash
+cp doc_2026-02-11_13-30-10.env.example .env
+```
+
+2. Обязательно проверьте/задайте минимум:
 
 ```env
 BOT_TOKEN=<telegram_bot_token>
 ROOT_ADMIN_TG_IDS=[123456789,987654321]
 REDIS_PASS=<strong_password>
-
-# В Docker-сети используйте host redis
 REDIS_BROKER_URI=redis://:<REDIS_PASS>@redis:6379/11
 REDIS_BROKER_RESULT_BACKEND_URI=redis://:<REDIS_PASS>@redis:6379/12
 ```
 
-> В исходном примере env Redis указан через `localhost`; для Docker-сети обычно корректнее `redis`.
-
-### 2) Подготовьте директории данных на хосте
+3. Подготовьте директории данных на VPS (используются как bind mounts):
 
 ```bash
 sudo mkdir -p /var/bot/static /var/bot/db
 sudo chown -R $USER:$USER /var/bot
 ```
 
-### 3) Соберите образы
+### C) First deploy (первый запуск)
 
-`docker-compose.yml` использует готовые имена образов, поэтому сначала соберите их вручную:
+Рекомендуемая команда (сборка + запуск в фоне):
 
 ```bash
-docker build -f Dockerfile.bot -t sl-tg-bot .
-docker build -f Dockerfile.cron -t sl-tg-bot-bg .
-docker build -f Dockerfile.api -t sl-tg-bot-api .
-docker build -f Dockerfile.miniapp -t sl-tg-bot-miniapp .
+docker compose up -d --build
 ```
 
-### 4) Запустите контейнеры
+Проверка состояния:
 
 ```bash
-docker compose up -d
 docker compose ps
 ```
 
-### 5) Проверьте логи ключевых сервисов
+### D) Update after code changes
+
+Обычное обновление:
 
 ```bash
-docker compose logs -f bot
-docker compose logs -f api
-docker compose logs -f bg
-docker compose logs -f front
-docker compose logs -f redis
+git pull
+docker compose up -d --build
 ```
+
+Обновление с полной пересборкой без кэша (когда нужно «чисто» пересобрать образы):
+
+```bash
+git pull
+docker compose build --no-cache bot bg api front
+docker compose up -d
+```
+
+> Legacy/альтернатива: ручные `docker build -f Dockerfile.* ...` обычно не нужны, т.к. текущий compose уже содержит `build` для `bot/bg/api/front`.
+
+### E) Restart / Logs / Inspect env
+
+Безопасный перезапуск (данные в `/var/bot/...` сохраняются):
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+Логи сервиса:
+
+```bash
+docker compose logs -f --tail=200 <service>
+```
+
+Примеры:
+
+```bash
+docker compose logs -f --tail=200 bot
+docker compose logs -f --tail=200 api
+```
+
+Проверка env внутри контейнера:
+
+```bash
+docker compose exec -T <service> env | sort | grep -E "BOT_TOKEN|ROOT_ADMIN|REDIS"
+```
+
+Пример:
+
+```bash
+docker compose exec -T bot env | sort | grep -E "BOT_TOKEN|ROOT_ADMIN|REDIS"
+```
+
+### F) Clean reset (destructive)
+
+Обычная остановка (safe):
+
+```bash
+docker compose down
+```
+
+Полный сброс окружения (destructive):
+
+```bash
+docker compose down -v
+```
+
+⚠️ **ВНИМАНИЕ:** `down -v` удаляет volumes/docker-тома проекта. Если вы храните критичные данные в Docker volumes, они будут потеряны. Для этого проекта основные данные вынесены в bind mounts (`/var/bot/static`, `/var/bot/db`), но команду всё равно используйте только осознанно.
 
 ---
 
@@ -108,15 +177,11 @@ docker compose logs -f redis
 
 ## Обновление на сервере
 
-Типовой сценарий:
+Базовый сценарий обновления:
 
 ```bash
 git pull
-docker build -f Dockerfile.bot -t sl-tg-bot .
-docker build -f Dockerfile.cron -t sl-tg-bot-bg .
-docker build -f Dockerfile.api -t sl-tg-bot-api .
-docker build -f Dockerfile.miniapp -t sl-tg-bot-miniapp .
-docker compose up -d
+docker compose up -d --build
 ```
 
 При необходимости очистите неиспользуемые образы:
@@ -124,6 +189,8 @@ docker compose up -d
 ```bash
 docker image prune -f
 ```
+
+> Legacy: ручные `docker build -f Dockerfile.* ...` оставляйте только как исключение (например, для отладки отдельных образов).
 
 ---
 

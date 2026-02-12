@@ -1,0 +1,14 @@
+# Exclude local dependencies and caches from Docker build context
+**/node_modules
+**/node_modules/**
+
+# Exclude local env files with secrets
+.env
+.env.*
+
+# VCS and Python/JS caches
+.git
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache

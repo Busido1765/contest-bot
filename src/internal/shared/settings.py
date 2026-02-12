@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=ROOT_PROJECT_DIR/".env",
+        extra="ignore",
     )
 
 

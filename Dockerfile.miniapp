@@ -7,6 +7,6 @@ COPY ./src/miniapp/yarn.lock ./src/miniapp/package.json ./
 RUN yarn install --frozen-lockfile \
     && chmod -R a+rx /app/node_modules/.bin
 
-COPY ./src/miniapp/ .
+COPY ./src/miniapp/ ./
 
-CMD ["yarn", "dev"]
+CMD ["node", "./node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "3000"]

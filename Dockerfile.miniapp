@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY ./src/miniapp/yarn.lock ./src/miniapp/package.json ./
 
-RUN yarn install
+RUN yarn install --frozen-lockfile \
+    && chmod -R a+rx /app/node_modules/.bin
 
 COPY ./src/miniapp/ .
 

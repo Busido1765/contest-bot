@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "DEBUG"
 
     BOT_TOKEN: str
-    BOT_NAME: str = "Sunlight_Randomaizer_Bot"
+    BOT_NAME: str = "contest_randomaiser_bot"
     BOT_WEBAPP_NAME: str = "webapp"
 
     IMG_FOLDER: str = str(ROOT_PROJECT_DIR / "static")

@@ -26,26 +26,26 @@ function App() {
             setTimeout(() => {
               if (a.status_code == 200) {
                 if (a.contest_status == 0) {
-                  setImg('/in_contest.svg')
+                  setImg('/in_contest.jpg')
                 }
                 if (a.contest_status == 1) {
-                  setImg('/already.svg')
+                  setImg('/already.jpg')
                 }
                 if (a.contest_status == 2) {
-                  setImg('/conditions.svg')
+                  setImg('/conditions.jpg')
                 }
                 if (a.contest_status == 3) {
-                  setImg('/finish.svg')
+                  setImg('/finish.jpg')
                 }
               } else {
-                setImg('/error.svg')
+                setImg('/error.jpg')
               }
             }, 500)
           });
       })
       .catch((er) => {
         console.log(er);
-	setImg('/error.svg')
+	setImg('/error.jpg')
       })
   }
 
@@ -53,7 +53,7 @@ function App() {
 	postEvent("web_app_setup_swipe_behavior", {
 		  allow_vertical_swipe: false,
 		});
-	postEvent("web_app_set_header_color", { color: "#ff0000" });
+	postEvent("web_app_set_header_color", { color: "#ffffff00" });
 
 	const initData = retrieveLaunchParams()
 
@@ -62,7 +62,7 @@ function App() {
 	const contest_id = initData.initData?.startParam;
 
   if (!user_nickname) {
-    setImg('/no_username.svg')
+    setImg('/no_username.jpg')
   }
 
 	console.log(user_tg_id, contest_id);
@@ -75,7 +75,7 @@ function App() {
     <div style={{ backgroundImage: `url(${img})` }} className="background">
     </div>
     <div className='boba'>
-      { !img && <img className='biba' src='/dice.webp' />}
+      { !img && <img className='biba' src='/check.jpg' />}
     </div>
     </>
   )

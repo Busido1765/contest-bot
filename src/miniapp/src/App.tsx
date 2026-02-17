@@ -4,7 +4,7 @@ import './App.css'
 
 
 
-const apiUrl = "https://botwebapp.ru/bot/api/contest/participate"
+const apiUrl = "https://contestbotcurling.ru/bot/api/contest/participate"
 
 
 function App() {

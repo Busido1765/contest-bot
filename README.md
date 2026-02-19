@@ -50,11 +50,29 @@ cp doc_2026-02-11_13-30-10.env.example .env
 
 ```env
 BOT_TOKEN=<telegram_bot_token>
+BOT_WEBAPP_NAME=<mini_app_short_name_from_@BotFather>
 ROOT_ADMIN_TG_IDS=[123456789,987654321]
 REDIS_PASS=<strong_password>
 REDIS_BROKER_URI=redis://:<REDIS_PASS>@redis:6379/11
 REDIS_BROKER_RESULT_BACKEND_URI=redis://:<REDIS_PASS>@redis:6379/12
 ```
+
+#### Что такое `BOT_WEBAPP_NAME`
+
+Это **не произвольное имя из кода** и не username бота.  
+Это `short name` вашего Telegram Mini App (часть URL после имени бота):
+
+```
+https://t.me/<bot_username>/<BOT_WEBAPP_NAME>?startapp=...
+```
+
+Как получить/проверить:
+1. Откройте `@BotFather` -> выберите бота.
+2. Команда `/myapps` (или `/newapp` / `/editapp` в зависимости от интерфейса).
+3. Найдите ваш Mini App и посмотрите его `short name` (slug).
+4. Это значение и нужно записать в `.env` как `BOT_WEBAPP_NAME`.
+
+Если Mini App не создан, сначала создайте его в BotFather и задайте домен (HTTPS).
 
 3. Подготовьте директории данных на VPS (используются как bind mounts):
 
@@ -203,7 +221,8 @@ docker image prune -f
 - Нет доступа к Web App/API через домен:
   - проверьте `nginx -t`;
   - проверьте TLS-сертификаты и `server_name`;
-  - проверьте firewall/security group.
+  - проверьте firewall/security group;
+  - если видите `ERR_CONNECTION_CLOSED`, чаще всего Nginx проксирует mini app на неверный upstream (например, `https://localhost:3000` вместо `http://127.0.0.1:3000` для Vite в контейнере).
 - Celery не выполняет задачи:
   - проверьте логи `bg`;
   - проверьте `REDIS_BROKER_URI` и `REDIS_BROKER_RESULT_BACKEND_URI`.

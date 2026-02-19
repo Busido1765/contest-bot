@@ -50,6 +50,7 @@ cp doc_2026-02-11_13-30-10.env.example .env
 
 ```env
 BOT_TOKEN=<telegram_bot_token>
+BOT_WEBAPP_NAME=<mini_app_short_name_from_@BotFather>
 ROOT_ADMIN_TG_IDS=[123456789,987654321]
 REDIS_PASS=<strong_password>
 REDIS_BROKER_URI=redis://:<REDIS_PASS>@redis:6379/11

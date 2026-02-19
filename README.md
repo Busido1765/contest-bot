@@ -221,7 +221,8 @@ docker image prune -f
 - Нет доступа к Web App/API через домен:
   - проверьте `nginx -t`;
   - проверьте TLS-сертификаты и `server_name`;
-  - проверьте firewall/security group.
+  - проверьте firewall/security group;
+  - если видите `ERR_CONNECTION_CLOSED`, чаще всего Nginx проксирует mini app на неверный upstream (например, `https://localhost:3000` вместо `http://127.0.0.1:3000` для Vite в контейнере).
 - Celery не выполняет задачи:
   - проверьте логи `bg`;
   - проверьте `REDIS_BROKER_URI` и `REDIS_BROKER_RESULT_BACKEND_URI`.

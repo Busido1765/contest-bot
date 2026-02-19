@@ -9,7 +9,7 @@
 - `bot` — основной Telegram-бот.
 - `bg` — фоновые задачи (Celery worker + beat).
 - `api` — HTTP API (FastAPI/uvicorn).
-- `front` — мини-приложение (Node/Yarn dev server на 3000).
+- `front` — mini app в production-режиме (статическая сборка, отдаётся через Nginx **внутри контейнера** на порту 80).
 - `redis` — брокер и backend для фоновых задач.
 
 ## Текущий практический приоритет
@@ -104,6 +104,8 @@ git pull
 docker compose up -d --build
 ```
 
+> После изменений: `front` больше не запускается через Vite dev server — собирается `yarn build` и отдаётся встроенным Nginx (production-подход).
+
 Обновление с полной пересборкой без кэша (когда нужно «чисто» пересобрать образы):
 
 ```bash
@@ -178,8 +180,11 @@ docker compose down -v
 
 ## Nginx (если нужен reverse proxy)
 
+Важно: в проекте уже есть Nginx внутри контейнера `front`, он раздаёт статику mini app.
+Хостовый Nginx (устанавливается на VPS) нужен отдельно только для домена/HTTPS (443) и проксирования к контейнерам.
+
 В `nginx.conf` есть пример:
-- `/` -> `https://localhost:3000/` (mini app)
+- `/` -> `http://localhost:3000/` (mini app, Nginx-контейнер front)
 - `/bot/api/` -> `http://localhost:8000/api/` (backend API)
 
 Что сделать:
@@ -189,7 +194,7 @@ docker compose down -v
 4. Проверить конфиг: `sudo nginx -t`.
 5. Перезапустить Nginx: `sudo systemctl reload nginx`.
 
-> Если mini app внутри контейнера работает по HTTP, обычно используют `proxy_pass http://localhost:3000/;`.
+> Для production-конфига из этого репозитория `front` слушает HTTP на порту 80 внутри контейнера и публикуется как `3000:80`, поэтому upstream прокси: `http://localhost:3000/`.
 
 ---
 
@@ -223,6 +228,15 @@ docker image prune -f
   - проверьте TLS-сертификаты и `server_name`;
   - проверьте firewall/security group;
   - если видите `ERR_CONNECTION_CLOSED`, чаще всего Nginx проксирует mini app на неверный upstream (например, `https://localhost:3000` вместо `http://127.0.0.1:3000` для Vite в контейнере).
+- `nginx: command not found` или `nginx.service not found`:
+  - у вас не установлен Nginx (или используется другой reverse proxy/панель);
+  - либо установите и настройте Nginx, либо откройте внешний 443/80 на другой прокси (Caddy/Traefik) до `front`/`api`;
+  - проверьте, что контейнер `front` действительно запущен: `docker compose ps front`;
+  - проверьте логи фронта: `docker compose logs -f --tail=200 front`.
+- `curl -I http://127.0.0.1:3000/` возвращает `Empty reply from server`:
+  - обычно фронт отвечает по HTTPS (Vite basic SSL) или процесс фронта не поднялся;
+  - проверьте протокол: `curl -kI https://127.0.0.1:3000/`;
+  - либо отключите HTTPS в Vite и используйте HTTP upstream в прокси (см. `src/miniapp/vite.config.ts`).
 - Celery не выполняет задачи:
   - проверьте логи `bg`;
   - проверьте `REDIS_BROKER_URI` и `REDIS_BROKER_RESULT_BACKEND_URI`.
@@ -233,3 +247,70 @@ docker image prune -f
 - `build`-секциями,
 - healthcheck’ами,
 - отключением публикации внутренних портов наружу.
+
+
+## Готовый чеклист для VPS (production)
+
+Ниже команды для Ubuntu/Debian сервера, где домен уже указывает на ваш VPS.
+
+Этот чеклист именно для **хостового Nginx**.
+Nginx внутри `front` уже есть и дополнительно не ставится — ставим только reverse proxy на самом VPS.
+
+1. Установите Nginx и Certbot:
+
+```bash
+sudo apt update
+sudo apt install -y nginx certbot python3-certbot-nginx
+```
+
+2. Убедитесь, что DNS уже указывает на сервер:
+
+```bash
+dig +short contestbotcurling.ru
+curl -I http://contestbotcurling.ru
+```
+
+3. Задеплойте контейнеры проекта:
+
+```bash
+cd ~/contest-bot
+git pull
+docker compose up -d --build
+```
+
+4. Создайте Nginx site config из `nginx.conf` проекта:
+
+```bash
+sudo cp ~/contest-bot/nginx.conf /etc/nginx/sites-available/contestbotcurling.ru.conf
+sudo ln -sf /etc/nginx/sites-available/contestbotcurling.ru.conf /etc/nginx/sites-enabled/contestbotcurling.ru.conf
+sudo rm -f /etc/nginx/sites-enabled/default
+```
+
+5. Проверьте Nginx и перезагрузите:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+6. Выпустите/подключите TLS-сертификат через Certbot:
+
+```bash
+sudo certbot --nginx -d contestbotcurling.ru -m you@example.com --agree-tos --no-eff-email
+```
+
+7. Проверка доступности backend/frontend:
+
+```bash
+curl -I http://127.0.0.1:3000/
+curl -I http://127.0.0.1:8000/api/health || true
+curl -I https://contestbotcurling.ru/
+curl -I https://contestbotcurling.ru/bot/api/
+```
+
+8. Если что-то не работает — сразу смотрите логи:
+
+```bash
+sudo journalctl -u nginx -n 200 --no-pager
+docker compose logs -f --tail=200 front api bot
+```

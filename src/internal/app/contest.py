@@ -21,6 +21,7 @@ from shared.settings import SETTINGS, Environment
 from shared.dates import HOUR, MINUTE, now
 from shared.exceptions import AccessError, NotFoundError
 from shared.types import ContestFinishKind, ContestPublicationKind, ContestState
+from shared.miniapp import generate_miniapp_participate_link
 
 from .dto.contest import ChannelCreate, ChannelGet, ContestCreate, ContestGet, ContestUpdate
 
@@ -180,10 +181,7 @@ class ContestApplication:
                 inline_keyboard=[[
                     InlineKeyboardButton(
                         text="Участвовать",
-                        url=(
-                            f"https://t.me/{bot_name}/{SETTINGS.BOT_WEBAPP_NAME}"
-                            f"?startapp={contest_id}"
-                        )
+                        url=generate_miniapp_participate_link(contest_id=contest_id, bot_name=bot_name)
                     )
                 ]]
             )

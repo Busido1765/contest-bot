@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     BOT_TOKEN: str
     BOT_NAME: str = "contest_randomaiser_bot"
-    BOT_WEBAPP_NAME: str = "webapp"
+    BOT_WEBAPP_NAME: str = "JoinLot"
 
     IMG_FOLDER: str = str(ROOT_PROJECT_DIR / "static")
 

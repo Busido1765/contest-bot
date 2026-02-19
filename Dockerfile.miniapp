@@ -1,12 +1,17 @@
-FROM node:21-alpine3.19
+FROM node:21-alpine3.19 AS builder
 
 WORKDIR /app
 
-COPY ./src/miniapp/yarn.lock ./src/miniapp/package.json ./
-
-RUN yarn install --frozen-lockfile \
-    && chmod -R a+rx /app/node_modules/.bin
+COPY ./src/miniapp/package.json ./src/miniapp/yarn.lock ./
+RUN yarn install --frozen-lockfile
 
 COPY ./src/miniapp/ ./
+RUN yarn build
 
-CMD ["node", "./node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "3000"]
+FROM nginx:1.27-alpine
+
+COPY ./src/miniapp/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/docs/ /usr/share/nginx/html/
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

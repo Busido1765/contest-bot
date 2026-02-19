@@ -21,6 +21,7 @@ from shared.settings import SETTINGS, Environment
 from shared.dates import HOUR, MINUTE, now
 from shared.exceptions import AccessError, NotFoundError
 from shared.types import ContestFinishKind, ContestPublicationKind, ContestState
+from shared.miniapp import generate_miniapp_participate_link
 
 from .dto.contest import ChannelCreate, ChannelGet, ContestCreate, ContestGet, ContestUpdate
 
@@ -169,6 +170,7 @@ class ContestApplication:
 
         dump_ = contest.model_dump(no_dict=True)
         contest_upd = ContestUpdate.model_validate(dump_)
+        bot_name = await self._get_bot_name()
 
         kwargs = {
             "photo": FSInputFile(contest.media[0]),
@@ -179,10 +181,7 @@ class ContestApplication:
                 inline_keyboard=[[
                     InlineKeyboardButton(
                         text="Участвовать",
-                        url=(
-                            f"https://t.me/{SETTINGS.BOT_NAME}/{SETTINGS.BOT_WEBAPP_NAME}"
-                            f"?startapp={contest_id}"
-                        )
+                        url=generate_miniapp_participate_link(contest_id=contest_id, bot_name=bot_name)
                     )
                 ]]
             )
@@ -222,6 +221,13 @@ class ContestApplication:
         contest_upd.post_message_id = message.message_id
 
         self._contest_repo.update(contest_id, contest_upd)
+
+    async def _get_bot_name(self) -> str:
+        me = await self._bot.get_me()
+        if me.username:
+            return me.username
+
+        return SETTINGS.BOT_NAME
 
     async def add_to_contest(self, user_tg_id: int, nickname: str, contest_id: str):
         contst = self._contest_repo.get_one(contest_id)
